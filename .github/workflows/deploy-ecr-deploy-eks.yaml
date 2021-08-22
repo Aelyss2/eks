@@ -62,4 +62,4 @@ jobs:
       env:
         KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
       with:
-        args: rollout status nginx-demo-deployment
+        args: rollout status deployment/nginx-demo-deployment

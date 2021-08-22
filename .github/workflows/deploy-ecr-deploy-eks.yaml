@@ -1,0 +1,59 @@
+name: deploy image to ecr repository
+
+
+on: 
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Build-and-push
+    runs-on: ubuntu-latest
+
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    ########
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credential@v1
+      with:
+        aws-access-key-id: ${{ secrets.KEY1 }}
+        aws-secret-access-key: ${{ secrets.KEY2 }}
+        aws-region: ${{ secrets.REGION }}
+
+    ########
+
+    - name: login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    ########
+
+    - name: Build, Tag and Push the image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: nginx-demo
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      
+    ########
+
+    - name: deploy to cluster
+      uses: kodermax/kubectl-aws-eks@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA_STAGING }}
+      with:
+        args: set image deployment/$ECR_REPOSITORY $ECR_REPOSITORY=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+    - name: verify deployment
+      uses: kodermax/kubectl-aws-eks@master
+      env:
+        KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+      with:
+        args: rollout status deployment/nginx-demo
